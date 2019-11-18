@@ -20,10 +20,6 @@ extern std::atomic<bool> ENABLE_LOGGING;
 #define INVALID_TXN_ID -1  // representing an invalid txn id
 #define INVALID_LSN -1     // representing an invalid lsn
 #define HEADER_PAGE_ID 0   // the header page id
-
-    // undef PAGE_SIZE from limit.h
-#undef PAGE_SIZE
-
 #define PAGE_SIZE 512     // size of a data page in byte
 #define LOG_BUFFER_SIZE                                                            \
   ((BUFFER_POOL_SIZE + 1) * PAGE_SIZE) // size of a log buffer in byte

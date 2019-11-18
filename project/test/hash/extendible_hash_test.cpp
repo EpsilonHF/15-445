@@ -3,7 +3,6 @@
  */
 
 #include <thread>
-#include <include/common/logger.h>
 
 #include "hash/extendible_hash.h"
 #include "gtest/gtest.h"
@@ -12,10 +11,8 @@ namespace cmudb {
 
 TEST(ExtendibleHashTest, SampleTest) {
   // set leaf size as 2
-        ExtendibleHash<int, std::string> *test =
-          new ExtendibleHash<int, std::string>(2);
-
-      LOG_INFO("START");
+  ExtendibleHash<int, std::string> *test =
+      new ExtendibleHash<int, std::string>(2);
 
   // insert several key/value pairs
   test->Insert(1, "a");
@@ -27,8 +24,6 @@ TEST(ExtendibleHashTest, SampleTest) {
   test->Insert(7, "g");
   test->Insert(8, "h");
   test->Insert(9, "i");
-
-        LOG_INFO("INSERT");
   EXPECT_EQ(2, test->GetLocalDepth(0));
   EXPECT_EQ(3, test->GetLocalDepth(1));
   EXPECT_EQ(2, test->GetLocalDepth(2));
@@ -49,9 +44,6 @@ TEST(ExtendibleHashTest, SampleTest) {
   EXPECT_EQ(1, test->Remove(4));
   EXPECT_EQ(1, test->Remove(1));
   EXPECT_EQ(0, test->Remove(20));
-
-
-        LOG_INFO("FINISH");
 
   delete test;
 }
