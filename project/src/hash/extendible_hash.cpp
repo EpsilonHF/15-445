@@ -10,14 +10,18 @@ namespace cmudb {
  * array_size: fixed array size for each bucket
  */
 template <typename K, typename V>
-ExtendibleHash<K, V>::ExtendibleHash(size_t size) {}
+ExtendibleHash<K, V>::ExtendibleHash(size_t size)
+    : globalDepth(0), bucketSize(size)
+{
+    bucketDict.push_back(std::make_shared<Bucket>(0));
+}
 
 /*
  * helper function to calculate the hashing address of input key
  */
 template <typename K, typename V>
 size_t ExtendibleHash<K, V>::HashKey(const K &key) {
-  return 0;
+    return std::hash<K>()(key);
 }
 
 /*
@@ -26,7 +30,7 @@ size_t ExtendibleHash<K, V>::HashKey(const K &key) {
  */
 template <typename K, typename V>
 int ExtendibleHash<K, V>::GetGlobalDepth() const {
-  return 0;
+    return globalDepth;
 }
 
 /*
@@ -35,7 +39,10 @@ int ExtendibleHash<K, V>::GetGlobalDepth() const {
  */
 template <typename K, typename V>
 int ExtendibleHash<K, V>::GetLocalDepth(int bucket_id) const {
-  return 0;
+    if (bucketDict[bucket_id]) {
+        return bucketDict[bucket_id]->localDepth;
+    }
+    return -1;
 }
 
 /*
@@ -43,7 +50,7 @@ int ExtendibleHash<K, V>::GetLocalDepth(int bucket_id) const {
  */
 template <typename K, typename V>
 int ExtendibleHash<K, V>::GetNumBuckets() const {
-  return 0;
+    return static_cast<int>(bucketDict.size());
 }
 
 /*
@@ -51,7 +58,17 @@ int ExtendibleHash<K, V>::GetNumBuckets() const {
  */
 template <typename K, typename V>
 bool ExtendibleHash<K, V>::Find(const K &key, V &value) {
-  return false;
+    std::lock_guard<std::mutex>lock(latch);
+    size_t offset = HashKey(key) & ((1 << globalDepth) - 1);
+
+    if (bucketDict[offset]) {
+        if (bucketDict[offset]->items.find(key) != bucketDict[offset]->items.end()) {
+            value = bucketDict[offset]->items[key];
+            return true;
+        }
+    }
+
+    return false;
 }
 
 /*
@@ -60,7 +77,15 @@ bool ExtendibleHash<K, V>::Find(const K &key, V &value) {
  */
 template <typename K, typename V>
 bool ExtendibleHash<K, V>::Remove(const K &key) {
-  return false;
+    std::lock_guard<std::mutex> lock(latch);
+    size_t offset = HashKey(key) & ((1 << globalDepth) - 1);
+    size_t cnt = 0;
+
+    if (bucketDict[offset]) {
+        cnt = bucketDict[offset]->items.erase(key);
+    }
+
+    return cnt != 0;
 }
 
 /*
@@ -69,7 +94,51 @@ bool ExtendibleHash<K, V>::Remove(const K &key) {
  * global depth
  */
 template <typename K, typename V>
-void ExtendibleHash<K, V>::Insert(const K &key, const V &value) {}
+void ExtendibleHash<K, V>::Insert(const K &key, const V &value) {
+    std::lock_guard<std::mutex> lock(latch);
+    size_t offset = HashKey(key) & ((1 << globalDepth) - 1);
+    std::shared_ptr<Bucket> target = bucketDict[offset];
+
+    while (target->items.size() == bucketSize) {
+        // split bucket
+        if (target->localDepth == globalDepth) {
+            size_t length = bucketDict.size();
+            for (size_t i = 0; i < length; i++) {
+                bucketDict.push_back(bucketDict[i]);
+            }
+            ++globalDepth;
+        }
+        int mask = (1 << target->localDepth);
+
+        auto a = std::make_shared<Bucket>(target->localDepth + 1);
+        auto b = std::make_shared<Bucket>(target->localDepth + 1);
+
+        for (auto item : target->items) {
+            size_t newKey = HashKey(item.first);
+            if (newKey & mask) {
+                b->items.insert(item);
+            }
+            else {
+                a->items.insert(item);
+            }
+        }
+
+        for (size_t i = 0; i < bucketDict.size(); i++) {
+            if (bucketDict[i] == target) {
+                if (i & mask) {
+                    bucketDict[i] = b;
+                }
+                else {
+                    bucketDict[i] = a;
+                }
+            }
+        }
+        offset = HashKey(key) & ((1 << globalDepth) - 1);
+        target = bucketDict[offset];
+    }
+
+    bucketDict[offset]->items[key] = value;
+}
 
 template class ExtendibleHash<page_id_t, Page *>;
 template class ExtendibleHash<Page *, std::list<Page *>::iterator>;
