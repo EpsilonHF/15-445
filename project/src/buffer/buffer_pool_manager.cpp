@@ -64,7 +64,7 @@ Page *BufferPoolManager::FetchPage(page_id_t page_id) {
         free_list_->pop_front();
     }
     else {
-        if (!replacer_->Victim(target)) {
+        if (!replacer_->Victim(target) || target->pin_count_ > 0) {
             return nullptr;
         }
     }
@@ -83,6 +83,7 @@ Page *BufferPoolManager::FetchPage(page_id_t page_id) {
     target->pin_count_ = 1;
 
     // update page
+    target->ResetMemory();
     disk_manager_->ReadPage(page_id, target->GetData());
 
     return target;
@@ -184,7 +185,7 @@ Page *BufferPoolManager::NewPage(page_id_t &page_id) {
         free_list_->pop_front();
     }
     else {
-        if (!replacer_->Victim(target)) {
+        if (!replacer_->Victim(target) || target->pin_count_ > 0) {
             return nullptr;
         }
         if (target->is_dirty_) {
