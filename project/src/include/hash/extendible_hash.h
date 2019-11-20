@@ -24,7 +24,6 @@ template <typename K, typename V>
 class ExtendibleHash : public HashTable<K, V> {
     class Bucket {
     public:
-        Bucket() = default;
         explicit Bucket(int depth)
             : localDepth(depth)
         {}
